@@ -242,9 +242,9 @@ Management access: To be verified before resubmission.
 
 ## Developer
 
-Prepared by Firomsa Girma Worku '/n'
-Position Full Stack Developer Intern Applicant '/n'
-Application ID : NXT-2026-01156
+Prepared by Firomsa Girma Worku.
+Position Full Stack Developer Intern Applicant.
+Application ID : NXT-2026-01156.
 
 ## License
 
