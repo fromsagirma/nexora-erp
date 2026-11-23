@@ -1,0 +1,19 @@
+
+flowchart TB
+    U[ERP User] --> FE[React + TypeScript Frontend]
+
+    FE -->|HTTP / JSON| API[Express REST API]
+
+    API --> MW[Middleware]
+    MW --> CTRL[Controllers]
+    CTRL --> SVC[Services]
+    SVC --> ORM[Prisma ORM]
+    ORM --> DB[(PostgreSQL)]
+
+    API --> AUTH[JWT Authentication]
+    API --> VALID[Zod Validation]
+
+    DB --> USERS[Users and Roles]
+    DB --> INV[Inventory]
+    DB --> STOCK[Stock Balances and Movements]
+    DB --> AUDIT[Audit Logs]

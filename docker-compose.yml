@@ -1,0 +1,25 @@
+
+services:
+  db:
+    image: postgres:17
+    container_name: nexora-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexora_admin
+      POSTGRES_DB: nexora_erp
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD in .env}
+      NEXORA_MIGRATOR_PASSWORD: ${NEXORA_MIGRATOR_PASSWORD:?Set NEXORA_MIGRATOR_PASSWORD in .env}
+      NEXORA_APP_PASSWORD: ${NEXORA_APP_PASSWORD:?Set NEXORA_APP_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - nexora_postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexora_admin -d nexora_erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  nexora_postgres_data:

@@ -1,0 +1,271 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum StockMovementType {
+  RECEIPT
+  SHIPMENT
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+  RESERVATION
+  RESERVATION_RELEASE
+}
+
+enum IdempotencyStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ============================================================
+// USERS AND ROLES
+// ============================================================
+
+model Role {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @unique @db.VarChar(50)
+  description String? @db.VarChar(255)
+
+  users User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model User {
+  id           String  @id @default(uuid()) @db.Uuid
+  fullName     String  @db.VarChar(150)
+  email        String  @unique @db.VarChar(255)
+  passwordHash String  @db.VarChar(255)
+  isActive     Boolean @default(true)
+
+  roleId String @db.Uuid
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  // User-related historical records
+  stockMovements  StockMovement[]
+  auditLogs       AuditLog[]
+  idempotencyKeys IdempotencyKey[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roleId])
+  @@map("users")
+}
+
+// ============================================================
+// SUPPLIERS AND CUSTOMERS
+// ============================================================
+
+model Supplier {
+  id       String  @id @default(uuid()) @db.Uuid
+  name     String  @db.VarChar(150)
+  email    String? @db.VarChar(255)
+  phone    String? @db.VarChar(30)
+  address  String? @db.VarChar(500)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@map("suppliers")
+}
+
+model Customer {
+  id       String  @id @default(uuid()) @db.Uuid
+  name     String  @db.VarChar(150)
+  email    String? @db.VarChar(255)
+  phone    String? @db.VarChar(30)
+  address  String? @db.VarChar(500)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@map("customers")
+}
+
+// ============================================================
+// PRODUCT CATALOGUE
+// ============================================================
+
+model Category {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @unique @db.VarChar(100)
+  description String? @db.VarChar(255)
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+model Product {
+  id          String  @id @default(uuid()) @db.Uuid
+  sku         String  @unique @db.VarChar(80)
+  name        String  @db.VarChar(150)
+  description String?
+  unit        String  @default("piece") @db.VarChar(30)
+  unitPrice   Decimal @default(0) @db.Decimal(18, 2)
+  isActive    Boolean @default(true)
+
+  categoryId String   @db.Uuid
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  stockBalances  StockBalance[]
+  stockMovements StockMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([name])
+  @@map("products")
+}
+
+// ============================================================
+// WAREHOUSES AND STOCK
+// ============================================================
+
+model Warehouse {
+  id       String  @id @default(uuid()) @db.Uuid
+  name     String  @unique @db.VarChar(120)
+  location String? @db.VarChar(255)
+  isActive Boolean @default(true)
+
+  stockBalances  StockBalance[]
+  stockMovements StockMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("warehouses")
+}
+
+model StockBalance {
+  id String @id @default(uuid()) @db.Uuid
+
+  productId   String @db.Uuid
+  warehouseId String @db.Uuid
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  onHand   Decimal @default(0) @db.Decimal(18, 3)
+  reserved Decimal @default(0) @db.Decimal(18, 3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, warehouseId])
+  @@index([warehouseId])
+  @@map("stock_balances")
+}
+
+// ============================================================
+// STOCK MOVEMENT LEDGER
+// ============================================================
+
+model StockMovement {
+  id String @id @default(uuid()) @db.Uuid
+
+  productId   String  @db.Uuid
+  warehouseId String  @db.Uuid
+  actorId     String? @db.Uuid
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  actor     User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  type     StockMovementType
+  quantity Decimal           @db.Decimal(18, 3)
+
+  // Reference to the business operation that created this movement.
+  // Example: sourceType = "GOODS_RECEIPT"
+  //          sourceId   = the goods receipt ID.
+  sourceType String? @db.VarChar(50)
+  sourceId   String? @db.Uuid
+
+  notes String?
+
+  createdAt DateTime @default(now())
+
+  @@index([productId, warehouseId, createdAt])
+  @@index([sourceType, sourceId])
+  @@index([actorId])
+  @@map("stock_movements")
+}
+
+// ============================================================
+// AUDIT LOG
+// ============================================================
+
+model AuditLog {
+  id      String  @id @default(uuid()) @db.Uuid
+  actorId String? @db.Uuid
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  action     String  @db.VarChar(100)
+  entityType String  @db.VarChar(100)
+  entityId   String? @db.Uuid
+
+  beforeData Json?
+  afterData  Json?
+
+  ipAddress String? @db.VarChar(45)
+  requestId String? @db.VarChar(100)
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// REQUEST IDEMPOTENCY
+// ============================================================
+
+model IdempotencyKey {
+  id String @id @default(uuid()) @db.Uuid
+
+  key       String @db.VarChar(255)
+  actorId   String @db.Uuid
+  operation String @db.VarChar(100)
+
+  // Each idempotency record belongs to an existing user.
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  status       IdempotencyStatus @default(PROCESSING)
+  responseCode Int?
+  responseBody Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Prevent duplicate requests for the same user and operation.
+  @@unique([actorId, operation, key])
+  @@index([createdAt])
+  @@map("idempotency_keys")
+}
