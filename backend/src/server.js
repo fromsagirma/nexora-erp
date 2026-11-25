@@ -2,7 +2,7 @@
 import app from "./app.js";
 import { prisma } from "./config/database.js";
 
-const PORT = Number(process.env.PORT) || 8000;
+const PORT = Number(process.env.PORT);
 
 let server;
 
